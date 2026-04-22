@@ -8,8 +8,9 @@ from pathlib import Path
 import numpy as np
 import numpy.testing as npt
 
-SCRIPT_PATH = Path(__file__).with_name("track2p_pyrecest_bridge.py")
-sys.path.insert(0, str(SCRIPT_PATH.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_PATH = PROJECT_ROOT / "src"
+sys.path[:0] = [str(PROJECT_ROOT), str(SRC_PATH)]
 
 from track2p_pyrecest_bridge import CalciumPlaneData, Track2pSession  # noqa: E402
 from track2p_registration_extension import (  # noqa: E402
@@ -32,6 +33,7 @@ def _install_fake_point_set_registration(monkeypatch) -> None:
             points = np.asarray(points, dtype=float)
             return (self.matrix @ points.T).T + self.offset
 
+    # pylint: disable=too-many-instance-attributes
     class RegistrationResult:
         def __init__(self, transform, assignment, transformed_reference_points):
             self.transform = transform
@@ -64,9 +66,9 @@ def _install_fake_point_set_registration(monkeypatch) -> None:
             transformed_reference_points=transform.apply(reference_points),
         )
 
-    fake_registration.AffineTransform = AffineTransform
-    fake_registration.RegistrationResult = RegistrationResult
-    fake_registration.joint_registration_assignment = joint_registration_assignment
+    setattr(fake_registration, "AffineTransform", AffineTransform)
+    setattr(fake_registration, "RegistrationResult", RegistrationResult)
+    setattr(fake_registration, "joint_registration_assignment", joint_registration_assignment)
 
     monkeypatch.setitem(sys.modules, "pyrecest", fake_pyrecest)
     monkeypatch.setitem(sys.modules, "pyrecest.utils", fake_utils)

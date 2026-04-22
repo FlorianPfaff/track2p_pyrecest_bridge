@@ -18,7 +18,7 @@ association-bundle construction.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, TypedDict, Unpack
 
 import numpy as np
 
@@ -32,7 +32,65 @@ from track2p_pyrecest_bridge import (
 RegistrationModel = Literal["translation", "rigid", "affine"]
 
 
+class _RegistrationKwargs(TypedDict, total=False):
+    order: str
+    weighted_centroids: bool
+    registration_model: RegistrationModel
+    registration_max_cost: float | None
+    registration_max_iterations: int
+    registration_tolerance: float
+    min_matches: int | None
+    allow_reflection: bool
+    binarize_registered_masks: bool
+    registered_mask_threshold: float
+
+
+class _AssociationBundleKwargs(TypedDict, total=False):
+    order: str
+    weighted_centroids: bool
+    velocity_variance: float
+    regularization: float
+    pairwise_cost_kwargs: Mapping[str, Any] | None
+    return_pairwise_components: bool
+
+
+class _RegisteredSessionPairKwargs(TypedDict, total=False):
+    order: str
+    weighted_centroids: bool
+    velocity_variance: float
+    regularization: float
+    registration_model: RegistrationModel
+    registration_max_cost: float | None
+    registration_max_iterations: int
+    registration_tolerance: float
+    min_matches: int | None
+    allow_reflection: bool
+    pairwise_cost_kwargs: Mapping[str, Any] | None
+    return_pairwise_components: bool
+    binarize_registered_masks: bool
+    registered_mask_threshold: float
+
+
+_DEFAULT_REGISTERED_SESSION_PAIR_KWARGS: _RegisteredSessionPairKwargs = {
+    "order": "xy",
+    "weighted_centroids": False,
+    "velocity_variance": 25.0,
+    "regularization": 1e-6,
+    "registration_model": "affine",
+    "registration_max_cost": None,
+    "registration_max_iterations": 25,
+    "registration_tolerance": 1e-8,
+    "min_matches": None,
+    "allow_reflection": False,
+    "pairwise_cost_kwargs": None,
+    "return_pairwise_components": True,
+    "binarize_registered_masks": False,
+    "registered_mask_threshold": 0.5,
+}
+
+
 @dataclass(frozen=True)
+# pylint: disable=too-many-instance-attributes
 class PlaneRegistrationBundle:
     """Result of registering one measurement plane to one reference plane."""
 
@@ -139,6 +197,83 @@ def _invert_affine(
     return inverse_matrix, inverse_offset
 
 
+# pylint: disable=too-many-arguments
+def _registration_kwargs(
+    *,
+    order: str,
+    weighted_centroids: bool,
+    registration_model: RegistrationModel,
+    registration_max_cost: float | None,
+    registration_max_iterations: int,
+    registration_tolerance: float,
+    min_matches: int | None,
+    allow_reflection: bool,
+    binarize_registered_masks: bool,
+    registered_mask_threshold: float,
+) -> _RegistrationKwargs:
+    return {
+        "order": order,
+        "weighted_centroids": weighted_centroids,
+        "registration_model": registration_model,
+        "registration_max_cost": registration_max_cost,
+        "registration_max_iterations": registration_max_iterations,
+        "registration_tolerance": registration_tolerance,
+        "min_matches": min_matches,
+        "allow_reflection": allow_reflection,
+        "binarize_registered_masks": binarize_registered_masks,
+        "registered_mask_threshold": registered_mask_threshold,
+    }
+
+
+# pylint: disable=too-many-arguments
+def _association_bundle_kwargs(
+    *,
+    order: str,
+    weighted_centroids: bool,
+    velocity_variance: float,
+    regularization: float,
+    pairwise_cost_kwargs: Mapping[str, Any] | None,
+    return_pairwise_components: bool,
+) -> _AssociationBundleKwargs:
+    return {
+        "order": order,
+        "weighted_centroids": weighted_centroids,
+        "velocity_variance": velocity_variance,
+        "regularization": regularization,
+        "pairwise_cost_kwargs": pairwise_cost_kwargs,
+        "return_pairwise_components": return_pairwise_components,
+    }
+
+
+# pylint: disable=too-many-arguments
+def _build_registration_ops(
+    measurement_plane: CalciumPlaneData,
+    *,
+    registration_model: RegistrationModel,
+    effective_model: RegistrationModel,
+    order: str,
+    reference_to_measurement_matrix: np.ndarray,
+    reference_to_measurement_offset: np.ndarray,
+    measurement_to_reference_matrix: np.ndarray,
+    measurement_to_reference_offset: np.ndarray,
+    registration_max_cost: float,
+) -> dict[str, Any]:
+    registration_ops = {} if measurement_plane.ops is None else dict(measurement_plane.ops)
+    registration_ops.update(
+        {
+            "pyrecest_registration_model_requested": registration_model,
+            "pyrecest_registration_model_effective": effective_model,
+            "pyrecest_registration_order": order,
+            "pyrecest_reference_to_measurement_matrix": reference_to_measurement_matrix,
+            "pyrecest_reference_to_measurement_offset": reference_to_measurement_offset,
+            "pyrecest_measurement_to_reference_matrix": measurement_to_reference_matrix,
+            "pyrecest_measurement_to_reference_offset": measurement_to_reference_offset,
+            "pyrecest_registration_max_cost": registration_max_cost,
+        }
+    )
+    return registration_ops
+
+
 def _grid_points(image_shape: tuple[int, int], *, order: str) -> np.ndarray:
     rows, cols = np.indices(image_shape, dtype=float)
     if order == "xy":
@@ -230,6 +365,7 @@ def warp_image_into_reference_frame(
     return _bilinear_sample(np.asarray(image, dtype=float), x_coords, y_coords)
 
 
+# pylint: disable=too-many-arguments
 def warp_roi_masks_into_reference_frame(
     roi_masks: np.ndarray,
     reference_to_measurement_matrix: np.ndarray,
@@ -260,6 +396,7 @@ def warp_roi_masks_into_reference_frame(
     return warped_masks
 
 
+# pylint: disable=too-many-arguments,too-many-locals
 def register_measurement_plane_to_reference(
     reference_plane: CalciumPlaneData,
     measurement_plane: CalciumPlaneData,
@@ -307,7 +444,9 @@ def register_measurement_plane_to_reference(
         )
 
     try:
-        from pyrecest.utils.point_set_registration import joint_registration_assignment
+        from pyrecest.utils.point_set_registration import (  # type: ignore[import-untyped]
+            joint_registration_assignment,
+        )
     except ImportError as exc:  # pragma: no cover - runtime dependency
         raise ImportError(
             "PyRecEst point-set registration support is required for "
@@ -356,20 +495,16 @@ def register_measurement_plane_to_reference(
             order=order,
         )
 
-    registration_ops = {}
-    if measurement_plane.ops is not None:
-        registration_ops.update(dict(measurement_plane.ops))
-    registration_ops.update(
-        {
-            "pyrecest_registration_model_requested": registration_model,
-            "pyrecest_registration_model_effective": effective_model,
-            "pyrecest_registration_order": order,
-            "pyrecest_reference_to_measurement_matrix": reference_to_measurement_matrix,
-            "pyrecest_reference_to_measurement_offset": reference_to_measurement_offset,
-            "pyrecest_measurement_to_reference_matrix": measurement_to_reference_matrix,
-            "pyrecest_measurement_to_reference_offset": measurement_to_reference_offset,
-            "pyrecest_registration_max_cost": float(registration_max_cost),
-        }
+    registration_ops = _build_registration_ops(
+        measurement_plane,
+        registration_model=registration_model,
+        effective_model=effective_model,
+        order=order,
+        reference_to_measurement_matrix=reference_to_measurement_matrix,
+        reference_to_measurement_offset=reference_to_measurement_offset,
+        measurement_to_reference_matrix=measurement_to_reference_matrix,
+        measurement_to_reference_offset=measurement_to_reference_offset,
+        registration_max_cost=float(registration_max_cost),
     )
 
     registered_plane = measurement_plane.with_replaced_masks(
@@ -393,6 +528,7 @@ def register_measurement_plane_to_reference(
     )
 
 
+# pylint: disable=too-many-arguments
 def build_registered_session_pair_association_bundle(
     reference_session: Track2pSession,
     measurement_session: Track2pSession,
@@ -414,9 +550,7 @@ def build_registered_session_pair_association_bundle(
 ) -> RegisteredSessionPairBundle:
     """Register the later session, then build the standard association bundle."""
 
-    plane_registration = register_measurement_plane_to_reference(
-        reference_session.plane_data,
-        measurement_session.plane_data,
+    registration_kwargs = _registration_kwargs(
         order=order,
         weighted_centroids=weighted_centroids,
         registration_model=registration_model,
@@ -428,16 +562,25 @@ def build_registered_session_pair_association_bundle(
         binarize_registered_masks=binarize_registered_masks,
         registered_mask_threshold=registered_mask_threshold,
     )
-    association_bundle = build_session_pair_association_bundle(
-        reference_session,
-        measurement_session,
-        measurement_plane_in_reference_frame=plane_registration.registered_measurement_plane,
+    association_kwargs = _association_bundle_kwargs(
         order=order,
         weighted_centroids=weighted_centroids,
         velocity_variance=velocity_variance,
         regularization=regularization,
         pairwise_cost_kwargs=pairwise_cost_kwargs,
         return_pairwise_components=return_pairwise_components,
+    )
+
+    plane_registration = register_measurement_plane_to_reference(
+        reference_session.plane_data,
+        measurement_session.plane_data,
+        **registration_kwargs,
+    )
+    association_bundle = build_session_pair_association_bundle(
+        reference_session,
+        measurement_session,
+        measurement_plane_in_reference_frame=plane_registration.registered_measurement_plane,
+        **association_kwargs,
     )
     return RegisteredSessionPairBundle(
         plane_registration=plane_registration,
@@ -447,24 +590,14 @@ def build_registered_session_pair_association_bundle(
 
 def build_registered_consecutive_session_association_bundles(
     sessions: list[Track2pSession] | tuple[Track2pSession, ...],
-    *,
-    order: str = "xy",
-    weighted_centroids: bool = False,
-    velocity_variance: float = 25.0,
-    regularization: float = 1e-6,
-    registration_model: RegistrationModel = "affine",
-    registration_max_cost: float | None = None,
-    registration_max_iterations: int = 25,
-    registration_tolerance: float = 1e-8,
-    min_matches: int | None = None,
-    allow_reflection: bool = False,
-    pairwise_cost_kwargs: Mapping[str, Any] | None = None,
-    return_pairwise_components: bool = True,
-    binarize_registered_masks: bool = False,
-    registered_mask_threshold: float = 0.5,
+    **bundle_kwargs: Unpack[_RegisteredSessionPairKwargs],
 ) -> RegisteredConsecutiveBundles:
     """Build one registration-aware association bundle for each consecutive pair."""
 
+    effective_bundle_kwargs: _RegisteredSessionPairKwargs = {
+        **_DEFAULT_REGISTERED_SESSION_PAIR_KWARGS,
+        **bundle_kwargs,
+    }
     consecutive_bundles: list[RegisteredSessionPairBundle] = []
     sessions = list(sessions)
     for pair_index in range(len(sessions) - 1):
@@ -472,20 +605,7 @@ def build_registered_consecutive_session_association_bundles(
             build_registered_session_pair_association_bundle(
                 sessions[pair_index],
                 sessions[pair_index + 1],
-                order=order,
-                weighted_centroids=weighted_centroids,
-                velocity_variance=velocity_variance,
-                regularization=regularization,
-                registration_model=registration_model,
-                registration_max_cost=registration_max_cost,
-                registration_max_iterations=registration_max_iterations,
-                registration_tolerance=registration_tolerance,
-                min_matches=min_matches,
-                allow_reflection=allow_reflection,
-                pairwise_cost_kwargs=pairwise_cost_kwargs,
-                return_pairwise_components=return_pairwise_components,
-                binarize_registered_masks=binarize_registered_masks,
-                registered_mask_threshold=registered_mask_threshold,
+                **effective_bundle_kwargs,
             )
         )
     return RegisteredConsecutiveBundles(bundles=consecutive_bundles)
