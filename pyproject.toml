@@ -21,7 +21,6 @@ Repository = "https://github.com/FlorianPfaff/track2p_pyrecest_bridge"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["track2p_registration_extension"]
 [tool.poetry]
 requires-poetry = ">=2.1"
 
