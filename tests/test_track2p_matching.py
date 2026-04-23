@@ -1,4 +1,5 @@
 import csv
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +8,6 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
-import sys
 
 sys.path.insert(0, str(SRC_PATH))
 
@@ -111,8 +111,8 @@ def test_bundle_assignment_and_track_row_export(tmp_path):
     assert output_path.exists()
 
     with output_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = list(csv.reader(handle))
-
-    assert reader[0] == ["track_id", "s0", "s1", "s2"]
-    assert reader[1] == ["0", "10", "202", "-1"]
-    assert reader[2] == ["1", "20", "101", "303"]
+        assert list(csv.reader(handle)) == [
+            ["track_id", "s0", "s1", "s2"],
+            ["0", "10", "202", "-1"],
+            ["1", "20", "101", "303"],
+        ]
