@@ -1,13 +1,13 @@
 import bayescatrack
 import track2p_pyrecest_bridge
+import track2p_pyrecest_bridge.reference as bridge_reference
+import track2p_pyrecest_bridge.registration as bridge_registration
+import track2p_pyrecest_bridge.track2p_registration as bridge_track2p_registration
 from bayescatrack import association
 from bayescatrack import io as bayescatrack_io
 from bayescatrack import reference, registration, track2p_registration
 from bayescatrack.datasets import track2p as bayescatrack_track2p
 from tests._support import assert_module_reexports, run_module
-from track2p_pyrecest_bridge import reference as bridge_reference
-from track2p_pyrecest_bridge import registration as bridge_registration
-from track2p_pyrecest_bridge import track2p_registration as bridge_track2p_registration
 
 
 def test_root_package_reexports_expected_public_api():
