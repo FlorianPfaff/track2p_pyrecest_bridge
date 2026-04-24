@@ -132,9 +132,9 @@ def _normalize_header(header: str) -> str:
     return header.strip().lower().replace(" ", "_")
 
 
-def _parse_roi_value(
+def _parse_roi_value(  # pylint: disable=too-many-return-statements
     value: str | int | float | None,
-) -> int:  # pylint: disable=too-many-return-statements
+) -> int:
     if value is None:
         return -1
     if isinstance(value, (int, np.integer)):
