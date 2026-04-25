@@ -18,6 +18,23 @@ from bayescatrack import (
 )
 
 
+def _load_subject_sessions(
+    subject_dir: str | Path,
+    *,
+    plane_name: str,
+    input_format: str,
+    include_behavior: bool,
+    suite2p_kwargs: Mapping[str, Any],
+) -> list[Track2pSession]:
+    load_kwargs = {
+        **suite2p_kwargs,
+        "plane_name": plane_name,
+        "input_format": input_format,
+        "include_behavior": include_behavior,
+    }
+    return load_track2p_subject(subject_dir, **load_kwargs)
+
+
 def _load_track2p_registration_backend() -> tuple[Any, Any]:
     try:
         from track2p.register.elastix import itk_reg_all_roi, reg_img_elastix
@@ -102,23 +119,29 @@ def build_registered_subject_association_bundles(  # pylint: disable=too-many-ar
     return_pairwise_components: bool = True,
     **suite2p_kwargs: Any,
 ) -> list[SessionAssociationBundle]:
-    sessions = load_track2p_subject(
+    sessions = _load_subject_sessions(
         subject_dir,
         plane_name=plane_name,
         input_format=input_format,
         include_behavior=include_behavior,
-        **suite2p_kwargs,
+        suite2p_kwargs=suite2p_kwargs,
     )
     registered_measurement_planes = register_consecutive_session_measurement_planes(
         sessions, transform_type=transform_type
     )
+    association_kwargs: dict[str, Any] = {
+        name: value
+        for name, value in (
+            ("order", order),
+            ("weighted_centroids", weighted_centroids),
+            ("velocity_variance", velocity_variance),
+            ("regularization", regularization),
+            ("pairwise_cost_kwargs", pairwise_cost_kwargs),
+            ("return_pairwise_components", return_pairwise_components),
+        )
+    }
     return build_consecutive_session_association_bundles(
         sessions,
         measurement_planes_in_reference_frames=registered_measurement_planes,
-        order=order,
-        weighted_centroids=weighted_centroids,
-        velocity_variance=velocity_variance,
-        regularization=regularization,
-        pairwise_cost_kwargs=pairwise_cost_kwargs,
-        return_pairwise_components=return_pairwise_components,
+        **association_kwargs,
     )
