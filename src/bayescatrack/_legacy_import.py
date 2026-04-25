@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import sys
 from types import ModuleType
-from typing import Iterator, Mapping
+from typing import Iterator, Mapping, cast
 
 import bayescatrack as _package
 from bayescatrack.core import _bridge_impl
@@ -44,8 +44,8 @@ def bridge_alias(extra_modules: Mapping[str, ModuleType] | None = None) -> Itera
             if previous is _MISSING:
                 sys.modules.pop(full_name, None)
             else:
-                sys.modules[full_name] = previous
+                sys.modules[full_name] = cast(ModuleType, previous)
         if previous_bridge is _MISSING:
             sys.modules.pop("track2p_pyrecest_bridge", None)
         else:
-            sys.modules["track2p_pyrecest_bridge"] = previous_bridge
+            sys.modules["track2p_pyrecest_bridge"] = cast(ModuleType, previous_bridge)
