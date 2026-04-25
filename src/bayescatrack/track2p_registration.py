@@ -130,15 +130,12 @@ def build_registered_subject_association_bundles(  # pylint: disable=too-many-ar
         sessions, transform_type=transform_type
     )
     association_kwargs: dict[str, Any] = {
-        name: value
-        for name, value in (
-            ("order", order),
-            ("weighted_centroids", weighted_centroids),
-            ("velocity_variance", velocity_variance),
-            ("regularization", regularization),
-            ("pairwise_cost_kwargs", pairwise_cost_kwargs),
-            ("return_pairwise_components", return_pairwise_components),
-        )
+        "order": order,
+        "weighted_centroids": weighted_centroids,
+        "velocity_variance": velocity_variance,
+        "regularization": regularization,
+        "pairwise_cost_kwargs": pairwise_cost_kwargs,
+        "return_pairwise_components": return_pairwise_components,
     }
     return build_consecutive_session_association_bundles(
         sessions,
