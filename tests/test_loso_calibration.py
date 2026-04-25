@@ -6,7 +6,10 @@ import types
 import numpy as np
 import pytest
 
-from bayescatrack.experiments.track2p_benchmark import Track2pBenchmarkConfig, run_track2p_benchmark
+from bayescatrack.experiments.track2p_benchmark import (
+    Track2pBenchmarkConfig,
+    run_track2p_benchmark,
+)
 
 
 def _write_subject(subject_dir, write_raw_npy_session):
@@ -28,7 +31,10 @@ def _write_subject(subject_dir, write_raw_npy_session):
     np.save(
         track2p_dir / "track_ops.npy",
         {
-            "all_ds_path": np.array([str(subject_dir / session_name) for session_name in session_names], dtype=object),
+            "all_ds_path": np.array(
+                [str(subject_dir / session_name) for session_name in session_names],
+                dtype=object,
+            ),
             "vector_curation_plane_0": np.ones((2,), dtype=float),
         },
         allow_pickle=True,
@@ -87,8 +93,16 @@ def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_
     from bayescatrack.association import calibrated_costs
     from bayescatrack.association import pyrecest_global_assignment as global_assignment
 
-    monkeypatch.setattr(calibrated_costs, "register_plane_pair", lambda _reference, moving, **_kwargs: moving)
-    monkeypatch.setattr(global_assignment, "register_plane_pair", lambda _reference, moving, **_kwargs: moving)
+    monkeypatch.setattr(
+        calibrated_costs,
+        "register_plane_pair",
+        lambda _reference, moving, **_kwargs: moving,
+    )
+    monkeypatch.setattr(
+        global_assignment,
+        "register_plane_pair",
+        lambda _reference, moving, **_kwargs: moving,
+    )
 
     results = run_track2p_benchmark(
         Track2pBenchmarkConfig(
