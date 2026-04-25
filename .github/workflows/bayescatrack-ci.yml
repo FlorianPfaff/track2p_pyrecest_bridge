@@ -1,32 +1,28 @@
-name: Bridge CI
+name: BayesCaTrack CI
 
 on:
   push:
     branches:
       - main
     paths:
+      - "src/bayescatrack/**"
       - "src/track2p_pyrecest_bridge/**"
       - "tests/**"
-      - "track2p_pyrecest_bridge.py"
-      - "test_track2p_pyrecest_bridge.py"
       - "pyproject.toml"
       - "poetry.lock"
       - "README.md"
-      - "README_track2p_pyrecest_bridge.md"
-      - ".github/workflows/bridge-ci.yml"
+      - ".github/workflows/bayescatrack-ci.yml"
   pull_request:
     branches:
       - main
     paths:
+      - "src/bayescatrack/**"
       - "src/track2p_pyrecest_bridge/**"
       - "tests/**"
-      - "track2p_pyrecest_bridge.py"
-      - "test_track2p_pyrecest_bridge.py"
       - "pyproject.toml"
       - "poetry.lock"
       - "README.md"
-      - "README_track2p_pyrecest_bridge.md"
-      - ".github/workflows/bridge-ci.yml"
+      - ".github/workflows/bayescatrack-ci.yml"
   workflow_dispatch:
 
 permissions:
@@ -93,13 +89,13 @@ jobs:
 
       - name: Run summary command
         run: |
-          poetry run python -m track2p_pyrecest_bridge \
+          poetry run python -m bayescatrack \
             summary ci_smoke/jm123 --plane plane0 > summary.json
           cat summary.json
 
       - name: Run export command
         run: |
-          poetry run python -m track2p_pyrecest_bridge \
+          poetry run python -m bayescatrack \
             export ci_smoke/jm123 ci_smoke/jm123_plane0.npz \
             --plane plane0 > export-summary.json
           cat export-summary.json
@@ -144,7 +140,7 @@ jobs:
         if: matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-smoke-export
+          name: bayescatrack-smoke-export
           path: |
             ci_smoke/jm123_plane0.npz
             summary.json
@@ -175,12 +171,12 @@ jobs:
 
       - name: Verify module entry point from built package
         run: |
-          python -m track2p_pyrecest_bridge --help > /dev/null
+          python -m bayescatrack --help > /dev/null
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-package-dist
+          name: bayescatrack-package-dist
           path: dist/*
 
   publish-results:
