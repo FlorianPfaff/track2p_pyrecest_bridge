@@ -1,5 +1,7 @@
 """BayesCaTrack public package API."""
 
+# pylint: disable=duplicate-code
+
 from .core import bridge as _bridge
 
 CalciumPlaneData = _bridge.CalciumPlaneData
