@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 
 _MISSING_STRINGS = {"", "none", "nan", "null"}
+_TrackIdentity = TypeVar("_TrackIdentity", bound=tuple[int, ...])
 
 __all__ = (
     "complete_track_set",
@@ -193,8 +194,8 @@ def _coerce_optional_scalar(value: Any) -> Any:
 
 
 def _set_classification_counts(
-    predicted: set[tuple[int, ...]],
-    reference: set[tuple[int, ...]],
+    predicted: set[_TrackIdentity],
+    reference: set[_TrackIdentity],
 ) -> tuple[int, int, int]:
     return (
         len(predicted & reference),
