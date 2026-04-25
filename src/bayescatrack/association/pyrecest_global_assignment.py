@@ -43,7 +43,7 @@ def roi_aware_cost_kwargs() -> dict[str, float]:
     return {}
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-locals
 def build_registered_pairwise_costs(
     sessions: Sequence[Track2pSession],
     *,
@@ -91,7 +91,7 @@ def build_registered_pairwise_costs(
     return pairwise_costs
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-locals
 def solve_global_assignment_for_sessions(
     sessions: Sequence[Track2pSession],
     *,
