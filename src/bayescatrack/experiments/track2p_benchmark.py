@@ -6,7 +6,7 @@ import argparse
 import csv
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -18,14 +18,15 @@ from bayescatrack.association.pyrecest_global_assignment import (
     solve_global_assignment_for_sessions,
     tracks_to_suite2p_index_matrix,
 )
+from bayescatrack.core.bridge import find_track2p_session_dirs, load_track2p_subject
 from bayescatrack.evaluation.track2p_metrics import normalize_track_matrix, score_track_matrices
 from bayescatrack.reference import Track2pReference, load_aligned_subject_reference, load_track2p_reference
-from bayescatrack.core.bridge import find_track2p_session_dirs, load_track2p_subject
 
 BenchmarkMethod = Literal["track2p-baseline", "global-assignment"]
 OutputFormat = Literal["table", "json", "csv"]
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass(frozen=True)
 class Track2pBenchmarkConfig:
     """Configuration for one Track2p benchmark run."""
@@ -62,7 +63,7 @@ class SubjectBenchmarkResult:
     subject: str
     variant: str
     method: BenchmarkMethod
-    scores: dict[str, float | int | str]
+    scores: Mapping[str, float | int | str]
     n_sessions: int
     reference_source: str
 
@@ -73,7 +74,7 @@ class SubjectBenchmarkResult:
             "method": self.method,
             "n_sessions": self.n_sessions,
             "reference_source": self.reference_source,
-            **self.scores,
+            **dict(self.scores),
         }
 
 
