@@ -1,3 +1,13 @@
 """Experiment runners and benchmark CLIs for BayesCaTrack."""
 
-__all__: list[str] = []
+from .track2p_loso_calibration import (
+    LosoCalibrationFold,
+    LosoCalibrationResult,
+    run_track2p_loso_calibration,
+)
+
+__all__ = [
+    "LosoCalibrationFold",
+    "LosoCalibrationResult",
+    "run_track2p_loso_calibration",
+]
