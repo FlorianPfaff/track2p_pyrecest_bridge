@@ -129,14 +129,14 @@ def build_registered_subject_association_bundles(  # pylint: disable=too-many-ar
     registered_measurement_planes = register_consecutive_session_measurement_planes(
         sessions, transform_type=transform_type
     )
-    association_kwargs: dict[str, Any] = {
-        "order": order,
-        "weighted_centroids": weighted_centroids,
-        "velocity_variance": velocity_variance,
-        "regularization": regularization,
-        "pairwise_cost_kwargs": pairwise_cost_kwargs,
-        "return_pairwise_components": return_pairwise_components,
-    }
+
+    association_kwargs: dict[str, Any] = {"order": order}
+    association_kwargs["weighted_centroids"] = weighted_centroids
+    association_kwargs["velocity_variance"] = velocity_variance
+    association_kwargs["regularization"] = regularization
+    association_kwargs["pairwise_cost_kwargs"] = pairwise_cost_kwargs
+    association_kwargs["return_pairwise_components"] = return_pairwise_components
+
     return build_consecutive_session_association_bundles(
         sessions,
         measurement_planes_in_reference_frames=registered_measurement_planes,
