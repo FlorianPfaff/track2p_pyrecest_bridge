@@ -21,6 +21,9 @@ Repository = "https://github.com/FlorianPfaff/bayescatrack"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+bayescatrack = ["configs/*.yaml"]
 [tool.poetry]
 requires-poetry = ">=2.1"
 

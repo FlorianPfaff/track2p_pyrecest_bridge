@@ -19,4 +19,6 @@ load_track2p_subject = _bridge.load_track2p_subject
 main = _bridge.main
 summarize_subject = _bridge.summarize_subject
 
-__all__ = _bridge.__all__
+from .cli import main as main
+
+__all__ = tuple(dict.fromkeys((*_bridge.__all__, "main")))
