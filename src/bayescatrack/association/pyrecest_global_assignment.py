@@ -12,6 +12,7 @@ from bayescatrack.core.bridge import Track2pSession, build_session_pair_associat
 from bayescatrack.track2p_registration import register_plane_pair
 
 AssociationCost = Literal["registered-iou", "roi-aware"]
+SessionEdge = tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -19,8 +20,27 @@ class GlobalAssignmentRun:
     """Global assignment result plus the pairwise evidence used to build it."""
 
     result: Any
-    pairwise_costs: dict[tuple[int, int], np.ndarray]
+    pairwise_costs: dict[SessionEdge, np.ndarray]
     session_sizes: tuple[int, ...]
+    session_edges: tuple[SessionEdge, ...]
+
+
+def session_edge_pairs(num_sessions: int, *, max_gap: int = 2) -> tuple[SessionEdge, ...]:
+    """Return forward session edges admitted by a maximum skipped-session gap."""
+
+    num_sessions = int(num_sessions)
+    max_gap = int(max_gap)
+    if num_sessions < 0:
+        raise ValueError("num_sessions must be non-negative")
+    if max_gap < 1:
+        raise ValueError("max_gap must be at least 1")
+
+    edges: list[SessionEdge] = []
+    for source_session in range(max(0, num_sessions - 1)):
+        last_target = min(num_sessions, source_session + max_gap + 1)
+        for target_session in range(source_session + 1, last_target):
+            edges.append((source_session, target_session))
+    return tuple(edges)
 
 
 def registered_iou_cost_kwargs(*, similarity_epsilon: float = 1.0e-6) -> dict[str, float]:
@@ -56,38 +76,34 @@ def build_registered_pairwise_costs(
     regularization: float = 1.0e-6,
     pairwise_cost_kwargs: Mapping[str, Any] | None = None,
     return_pairwise_components: bool = False,
-) -> dict[tuple[int, int], np.ndarray]:
+) -> dict[SessionEdge, np.ndarray]:
     """Build registered pairwise cost matrices for consecutive and skip-session edges."""
 
     sessions = list(sessions)
-    if max_gap < 1:
-        raise ValueError("max_gap must be at least 1")
-
+    edges = session_edge_pairs(len(sessions), max_gap=max_gap)
     base_cost_kwargs = _cost_kwargs_for_method(cost)
     if pairwise_cost_kwargs is not None:
         base_cost_kwargs.update(dict(pairwise_cost_kwargs))
 
-    pairwise_costs: dict[tuple[int, int], np.ndarray] = {}
-    for source_session in range(len(sessions) - 1):
-        last_target = min(len(sessions), source_session + max_gap + 1)
-        for target_session in range(source_session + 1, last_target):
-            registered_measurement_plane = register_plane_pair(
-                sessions[source_session].plane_data,
-                sessions[target_session].plane_data,
-                transform_type=transform_type,
-            )
-            bundle = build_session_pair_association_bundle(
-                sessions[source_session],
-                sessions[target_session],
-                measurement_plane_in_reference_frame=registered_measurement_plane,
-                order=order,
-                weighted_centroids=weighted_centroids,
-                velocity_variance=velocity_variance,
-                regularization=regularization,
-                pairwise_cost_kwargs=base_cost_kwargs,
-                return_pairwise_components=return_pairwise_components,
-            )
-            pairwise_costs[(source_session, target_session)] = np.asarray(bundle.pairwise_cost_matrix, dtype=float)
+    pairwise_costs: dict[SessionEdge, np.ndarray] = {}
+    for source_session, target_session in edges:
+        registered_measurement_plane = register_plane_pair(
+            sessions[source_session].plane_data,
+            sessions[target_session].plane_data,
+            transform_type=transform_type,
+        )
+        bundle = build_session_pair_association_bundle(
+            sessions[source_session],
+            sessions[target_session],
+            measurement_plane_in_reference_frame=registered_measurement_plane,
+            order=order,
+            weighted_centroids=weighted_centroids,
+            velocity_variance=velocity_variance,
+            regularization=regularization,
+            pairwise_cost_kwargs=base_cost_kwargs,
+            return_pairwise_components=return_pairwise_components,
+        )
+        pairwise_costs[(source_session, target_session)] = np.asarray(bundle.pairwise_cost_matrix, dtype=float)
     return pairwise_costs
 
 
@@ -132,7 +148,12 @@ def solve_global_assignment_for_sessions(
         gap_penalty=float(gap_penalty),
         cost_threshold=cost_threshold,
     )
-    return GlobalAssignmentRun(result=result, pairwise_costs=pairwise_costs, session_sizes=session_sizes)
+    return GlobalAssignmentRun(
+        result=result,
+        pairwise_costs=pairwise_costs,
+        session_sizes=session_sizes,
+        session_edges=tuple(sorted(pairwise_costs)),
+    )
 
 
 def tracks_to_suite2p_index_matrix(tracks: Sequence[Mapping[int, int]], sessions: Sequence[Track2pSession]) -> np.ndarray:
