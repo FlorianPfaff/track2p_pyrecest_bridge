@@ -130,7 +130,6 @@ class SubjectTrackingResult:
 
 
 # pylint: disable=too-many-arguments,too-many-locals
-
 def run_registered_subject_tracking(
     subject_dir: str | Path,
     *,
@@ -163,14 +162,12 @@ def run_registered_subject_tracking(
     with ``fill_value``.
     """
 
-    sessions = tuple(
-        load_track2p_subject(
-            subject_dir,
-            plane_name=plane_name,
-            input_format=input_format,
-            include_behavior=include_behavior,
-            **suite2p_kwargs,
-        )
+    sessions = _load_subject_sessions(
+        subject_dir,
+        plane_name=plane_name,
+        input_format=input_format,
+        include_behavior=include_behavior,
+        suite2p_kwargs=suite2p_kwargs,
     )
     if not sessions:
         raise ValueError("No sessions were found")
@@ -236,6 +233,23 @@ def run_registered_subject_tracking(
     )
 
 
+def _load_subject_sessions(
+    subject_dir: str | Path,
+    *,
+    plane_name: str,
+    input_format: str,
+    include_behavior: bool,
+    suite2p_kwargs: Mapping[str, Any],
+) -> tuple[Track2pSession, ...]:
+    load_kwargs: dict[str, Any] = {
+        "plane_name": plane_name,
+        "input_format": input_format,
+        "include_behavior": include_behavior,
+        **suite2p_kwargs,
+    }
+    return tuple(load_track2p_subject(subject_dir, **load_kwargs))
+
+
 def _build_link_cost_matrix(
     track_rows: np.ndarray,
     match_results: Sequence[SessionMatchResult],
@@ -257,7 +271,7 @@ def _build_link_cost_matrix(
         for track_index, row in enumerate(track_rows):
             reference_roi = int(row[pair_index])
             measurement_roi = int(row[pair_index + 1])
-            if reference_roi == fill_value or measurement_roi == fill_value:
+            if fill_value in (reference_roi, measurement_roi):
                 continue
             link_costs[track_index, pair_index] = cost_lookup.get(
                 (reference_roi, measurement_roi),
