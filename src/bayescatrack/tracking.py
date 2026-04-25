@@ -138,6 +138,7 @@ def run_registered_subject_tracking(
     include_behavior: bool = True,
     order: str = "xy",
     weighted_centroids: bool = False,
+    # jscpd:ignore-start
     velocity_variance: float = 25.0,
     regularization: float = 1e-6,
     registration_model: RegistrationModel = "affine",
@@ -150,6 +151,7 @@ def run_registered_subject_tracking(
     return_pairwise_components: bool = True,
     binarize_registered_masks: bool = False,
     registered_mask_threshold: float = 0.5,
+    # jscpd:ignore-end
     assignment_max_cost: float | None = None,
     start_roi_indices: Sequence[int] | None = None,
     fill_value: int = -1,
@@ -164,10 +166,10 @@ def run_registered_subject_tracking(
 
     sessions = _load_subject_sessions(
         subject_dir,
-        plane_name=plane_name,
-        input_format=input_format,
-        include_behavior=include_behavior,
-        suite2p_kwargs=suite2p_kwargs,
+        plane_name,
+        input_format,
+        include_behavior,
+        suite2p_kwargs,
     )
     if not sessions:
         raise ValueError("No sessions were found")
@@ -235,18 +237,17 @@ def run_registered_subject_tracking(
 
 def _load_subject_sessions(
     subject_dir: str | Path,
-    *,
     plane_name: str,
     input_format: str,
     include_behavior: bool,
     suite2p_kwargs: Mapping[str, Any],
 ) -> tuple[Track2pSession, ...]:
-    load_kwargs: dict[str, Any] = {
-        "plane_name": plane_name,
-        "input_format": input_format,
-        "include_behavior": include_behavior,
-        **suite2p_kwargs,
-    }
+    load_kwargs = dict(suite2p_kwargs)
+    load_kwargs.update(
+        plane_name=plane_name,
+        input_format=input_format,
+        include_behavior=include_behavior,
+    )
     return tuple(load_track2p_subject(subject_dir, **load_kwargs))
 
 
