@@ -96,7 +96,9 @@ def _install_registration_passthrough(monkeypatch):
     from bayescatrack.association import calibrated_costs
     from bayescatrack.association import pyrecest_global_assignment as global_assignment
 
-    passthrough = lambda _reference, moving, **_kwargs: moving
+    def passthrough(_reference, moving, **_kwargs):
+        return moving
+
     monkeypatch.setattr(calibrated_costs, "register_plane_pair", passthrough)
     monkeypatch.setattr(global_assignment, "register_plane_pair", passthrough)
 
