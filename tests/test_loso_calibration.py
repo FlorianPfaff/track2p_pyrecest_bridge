@@ -12,7 +12,7 @@ from bayescatrack.experiments.track2p_benchmark import (
 )
 
 
-def _write_subject(subject_dir, write_raw_npy_session):
+def _write_subject_sessions(subject_dir, write_raw_npy_session):
     masks = np.zeros((2, 4, 4), dtype=bool)
     masks[0, 0:2, 0:2] = True
     masks[1, 2:4, 2:4] = True
@@ -26,6 +26,11 @@ def _write_subject(subject_dir, write_raw_npy_session):
             offset=float(10 * session_index),
         )
 
+    return session_names
+
+
+def _write_subject(subject_dir, write_raw_npy_session):
+    session_names = _write_subject_sessions(subject_dir, write_raw_npy_session)
     track2p_dir = subject_dir / "track2p"
     track2p_dir.mkdir()
     np.save(
@@ -47,17 +52,7 @@ def _write_subject(subject_dir, write_raw_npy_session):
 
 
 def _write_aligned_subject(subject_dir, write_raw_npy_session):
-    masks = np.zeros((2, 4, 4), dtype=bool)
-    masks[0, 0:2, 0:2] = True
-    masks[1, 2:4, 2:4] = True
-
-    for session_index, session_name in enumerate(("2024-05-01_a", "2024-05-02_a", "2024-05-03_a")):
-        write_raw_npy_session(
-            subject_dir,
-            session_name,
-            masks.copy(),
-            offset=float(10 * session_index),
-        )
+    _write_subject_sessions(subject_dir, write_raw_npy_session)
 
 
 def _install_fake_pyrecest(monkeypatch):
@@ -97,28 +92,22 @@ def _install_fake_pyrecest(monkeypatch):
     monkeypatch.setitem(sys.modules, "pyrecest.utils.multisession_assignment", fake_assignment)
 
 
-def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_raw_npy_session):
-    subject_a = tmp_path / "jm001"
-    subject_b = tmp_path / "jm002"
-    _write_subject(subject_a, write_raw_npy_session)
-    _write_subject(subject_b, write_raw_npy_session)
-    _install_fake_pyrecest(monkeypatch)
-
+def _install_registration_passthrough(monkeypatch):
     from bayescatrack.association import calibrated_costs
     from bayescatrack.association import pyrecest_global_assignment as global_assignment
 
-    monkeypatch.setattr(
-        calibrated_costs,
-        "register_plane_pair",
-        lambda _reference, moving, **_kwargs: moving,
-    )
-    monkeypatch.setattr(
-        global_assignment,
-        "register_plane_pair",
-        lambda _reference, moving, **_kwargs: moving,
-    )
+    passthrough = lambda _reference, moving, **_kwargs: moving
+    monkeypatch.setattr(calibrated_costs, "register_plane_pair", passthrough)
+    monkeypatch.setattr(global_assignment, "register_plane_pair", passthrough)
 
-    results = run_track2p_benchmark(
+
+def _run_loso_calibration(tmp_path, monkeypatch, subject_writer):
+    for subject_name in ("jm001", "jm002"):
+        subject_writer(tmp_path / subject_name)
+
+    _install_fake_pyrecest(monkeypatch)
+    _install_registration_passthrough(monkeypatch)
+    return run_track2p_benchmark(
         Track2pBenchmarkConfig(
             data=tmp_path,
             method="global-assignment",
@@ -127,6 +116,14 @@ def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_
             max_gap=2,
             include_behavior=False,
         )
+    )
+
+
+def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_raw_npy_session):
+    results = _run_loso_calibration(
+        tmp_path,
+        monkeypatch,
+        lambda subject_dir: _write_subject(subject_dir, write_raw_npy_session),
     )
 
     assert [result.subject for result in results] == ["jm001", "jm002"]
@@ -141,35 +138,10 @@ def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_
 
 
 def test_loso_calibration_uses_aligned_rows_when_track2p_reference_is_absent(tmp_path, monkeypatch, write_raw_npy_session):
-    subject_a = tmp_path / "jm001"
-    subject_b = tmp_path / "jm002"
-    _write_aligned_subject(subject_a, write_raw_npy_session)
-    _write_aligned_subject(subject_b, write_raw_npy_session)
-    _install_fake_pyrecest(monkeypatch)
-
-    from bayescatrack.association import calibrated_costs
-    from bayescatrack.association import pyrecest_global_assignment as global_assignment
-
-    monkeypatch.setattr(
-        calibrated_costs,
-        "register_plane_pair",
-        lambda _reference, moving, **_kwargs: moving,
-    )
-    monkeypatch.setattr(
-        global_assignment,
-        "register_plane_pair",
-        lambda _reference, moving, **_kwargs: moving,
-    )
-
-    results = run_track2p_benchmark(
-        Track2pBenchmarkConfig(
-            data=tmp_path,
-            method="global-assignment",
-            split="leave-one-subject-out",
-            cost="calibrated",
-            max_gap=2,
-            include_behavior=False,
-        )
+    results = _run_loso_calibration(
+        tmp_path,
+        monkeypatch,
+        lambda subject_dir: _write_aligned_subject(subject_dir, write_raw_npy_session),
     )
 
     assert [result.subject for result in results] == ["jm001", "jm002"]
