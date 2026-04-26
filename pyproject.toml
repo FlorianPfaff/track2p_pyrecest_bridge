@@ -17,7 +17,7 @@ dependencies = [
 bayescatrack = "bayescatrack:main"
 
 [project.urls]
-Repository = "https://github.com/FlorianPfaff/bayescatrack"
+Repository = "https://github.com/FlorianPfaff/BayesCaTrack"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
