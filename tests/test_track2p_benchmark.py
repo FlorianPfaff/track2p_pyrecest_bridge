@@ -5,8 +5,11 @@ import types
 
 import numpy as np
 import pytest
-
-from bayescatrack.experiments.track2p_benchmark import Track2pBenchmarkConfig, format_benchmark_table, run_track2p_benchmark
+from bayescatrack.experiments.track2p_benchmark import (
+    Track2pBenchmarkConfig,
+    format_benchmark_table,
+    run_track2p_benchmark,
+)
 
 
 def _write_subject(subject_dir, write_raw_npy_session):
@@ -37,7 +40,11 @@ def _write_subject(subject_dir, write_raw_npy_session):
         },
         allow_pickle=True,
     )
-    np.save(track2p_dir / "plane0_suite2p_indices.npy", np.array([[0, 0, 0], [1, 1, 1]], dtype=object), allow_pickle=True)
+    np.save(
+        track2p_dir / "plane0_suite2p_indices.npy",
+        np.array([[0, 0, 0], [1, 1, 1]], dtype=object),
+        allow_pickle=True,
+    )
 
 
 def _install_fake_multisession_assignment(monkeypatch):
@@ -61,14 +68,20 @@ def _install_fake_multisession_assignment(monkeypatch):
     fake_assignment.solve_multisession_assignment = solve_multisession_assignment
     monkeypatch.setitem(sys.modules, "pyrecest", fake_pyrecest)
     monkeypatch.setitem(sys.modules, "pyrecest.utils", fake_utils)
-    monkeypatch.setitem(sys.modules, "pyrecest.utils.multisession_assignment", fake_assignment)
+    monkeypatch.setitem(
+        sys.modules, "pyrecest.utils.multisession_assignment", fake_assignment
+    )
 
 
-def test_track2p_baseline_benchmark_scores_track2p_output(tmp_path, write_raw_npy_session):
+def test_track2p_baseline_benchmark_scores_track2p_output(
+    tmp_path, write_raw_npy_session
+):
     subject_dir = tmp_path / "jm001"
     _write_subject(subject_dir, write_raw_npy_session)
 
-    rows = run_track2p_benchmark(Track2pBenchmarkConfig(data=tmp_path, method="track2p-baseline"))
+    rows = run_track2p_benchmark(
+        Track2pBenchmarkConfig(data=tmp_path, method="track2p-baseline")
+    )
 
     assert len(rows) == 1
     result = rows[0].to_dict()
@@ -79,14 +92,20 @@ def test_track2p_baseline_benchmark_scores_track2p_output(tmp_path, write_raw_np
     assert "Track2p default" in format_benchmark_table([result])
 
 
-def test_global_assignment_benchmark_uses_skip_edges(tmp_path, monkeypatch, write_raw_npy_session):
+def test_global_assignment_benchmark_uses_skip_edges(
+    tmp_path, monkeypatch, write_raw_npy_session
+):
     subject_dir = tmp_path / "jm002"
     _write_subject(subject_dir, write_raw_npy_session)
     _install_fake_multisession_assignment(monkeypatch)
 
     from bayescatrack.association import pyrecest_global_assignment as global_assignment
 
-    monkeypatch.setattr(global_assignment, "register_plane_pair", lambda _reference, moving, **_kwargs: moving)
+    monkeypatch.setattr(
+        global_assignment,
+        "register_plane_pair",
+        lambda _reference, moving, **_kwargs: moving,
+    )
 
     rows = run_track2p_benchmark(
         Track2pBenchmarkConfig(

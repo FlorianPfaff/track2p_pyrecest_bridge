@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-
 from bayescatrack.core.bridge import (
     SessionAssociationBundle,
     Track2pSession,
@@ -33,10 +32,14 @@ class CalibratedAssociationModel:
     model: Any
     feature_names: tuple[str, ...] = DEFAULT_ASSOCIATION_FEATURES
 
-    def pairwise_cost_matrix_from_components(self, pairwise_components: Mapping[str, Any]) -> np.ndarray:
+    def pairwise_cost_matrix_from_components(
+        self, pairwise_components: Mapping[str, Any]
+    ) -> np.ndarray:
         """Convert BayesCaTrack pairwise components into calibrated assignment costs."""
 
-        features = pairwise_feature_tensor(pairwise_components, feature_names=self.feature_names)
+        features = pairwise_feature_tensor(
+            pairwise_components, feature_names=self.feature_names
+        )
         return np.asarray(self.model.pairwise_cost_matrix(features), dtype=float)
 
 
@@ -62,13 +65,18 @@ def pairwise_feature_tensor(
 ) -> np.ndarray:
     """Build a ``(n_reference, n_measurement, n_features)`` tensor from pairwise components."""
 
-    feature_planes = [_component_feature(pairwise_components, feature_name) for feature_name in feature_names]
+    feature_planes = [
+        _component_feature(pairwise_components, feature_name)
+        for feature_name in feature_names
+    ]
     if not feature_planes:
         raise ValueError("At least one feature is required")
     reference_shape = feature_planes[0].shape
     for feature_name, feature_plane in zip(feature_names, feature_planes):
         if feature_plane.shape != reference_shape:
-            raise ValueError(f"Feature {feature_name!r} has shape {feature_plane.shape}, expected {reference_shape}")
+            raise ValueError(
+                f"Feature {feature_name!r} has shape {feature_plane.shape}, expected {reference_shape}"
+            )
     return np.stack(feature_planes, axis=-1)
 
 
@@ -85,11 +93,19 @@ def label_matrix_from_reference(
 
     reference_indices = np.asarray(reference_roi_indices, dtype=int).reshape(-1)
     measurement_indices = np.asarray(measurement_roi_indices, dtype=int).reshape(-1)
-    labels = np.zeros((reference_indices.shape[0], measurement_indices.shape[0]), dtype=int)
-    reference_lookup = {int(roi_index): row for row, roi_index in enumerate(reference_indices)}
-    measurement_lookup = {int(roi_index): col for col, roi_index in enumerate(measurement_indices)}
+    labels = np.zeros(
+        (reference_indices.shape[0], measurement_indices.shape[0]), dtype=int
+    )
+    reference_lookup = {
+        int(roi_index): row for row, roi_index in enumerate(reference_indices)
+    }
+    measurement_lookup = {
+        int(roi_index): col for col, roi_index in enumerate(measurement_indices)
+    }
 
-    for roi_a, roi_b in reference.pairwise_matches(session_a, session_b, curated_only=curated_only):
+    for roi_a, roi_b in reference.pairwise_matches(
+        session_a, session_b, curated_only=curated_only
+    ):
         row = reference_lookup.get(int(roi_a))
         col = measurement_lookup.get(int(roi_b))
         if row is None or col is None:
@@ -116,7 +132,9 @@ def collect_reference_training_examples(
         if session_a < 0 or session_b >= len(sessions) or session_a >= session_b:
             raise ValueError(f"Invalid training edge {(session_a, session_b)}")
         bundle = _build_training_bundle(sessions, session_a, session_b, options)
-        features = pairwise_feature_tensor(bundle.pairwise_components, feature_names=options.feature_names)
+        features = pairwise_feature_tensor(
+            bundle.pairwise_components, feature_names=options.feature_names
+        )
         labels = label_matrix_from_reference(
             reference,
             session_a,
@@ -145,7 +163,9 @@ def fit_logistic_association_model(
 
     try:
         from pyrecest.utils.association_models import LogisticPairwiseAssociationModel
-    except ImportError as exc:  # pragma: no cover - exercised in runtime environments without PyRecEst
+    except (
+        ImportError
+    ) as exc:  # pragma: no cover - exercised in runtime environments without PyRecEst
         raise ImportError(
             "PyRecEst with pyrecest.utils.association_models is required to fit calibrated association costs."
         ) from exc
@@ -189,7 +209,9 @@ def calibrated_cost_matrix_from_bundle(
 ) -> np.ndarray:
     """Return calibrated assignment costs for one registration-aware association bundle."""
 
-    return calibrated_model.pairwise_cost_matrix_from_components(bundle.pairwise_components)
+    return calibrated_model.pairwise_cost_matrix_from_components(
+        bundle.pairwise_components
+    )
 
 
 def _build_training_bundle(
@@ -216,7 +238,9 @@ def _build_training_bundle(
     )
 
 
-def _component_feature(pairwise_components: Mapping[str, Any], feature_name: str) -> np.ndarray:
+def _component_feature(
+    pairwise_components: Mapping[str, Any], feature_name: str
+) -> np.ndarray:
     if feature_name == "one_minus_iou":
         return 1.0 - _finite_component(pairwise_components, "iou")
     if feature_name == "one_minus_mask_cosine":
@@ -224,10 +248,14 @@ def _component_feature(pairwise_components: Mapping[str, Any], feature_name: str
     return _finite_component(pairwise_components, feature_name)
 
 
-def _finite_component(pairwise_components: Mapping[str, Any], component_name: str) -> np.ndarray:
+def _finite_component(
+    pairwise_components: Mapping[str, Any], component_name: str
+) -> np.ndarray:
     if component_name not in pairwise_components:
         raise KeyError(f"Pairwise components do not contain {component_name!r}")
     values = np.asarray(pairwise_components[component_name], dtype=float)
     if values.ndim != 2:
-        raise ValueError(f"Pairwise component {component_name!r} must be two-dimensional")
+        raise ValueError(
+            f"Pairwise component {component_name!r} must be two-dimensional"
+        )
     return np.nan_to_num(values, nan=0.0, posinf=1.0e6, neginf=-1.0e6)

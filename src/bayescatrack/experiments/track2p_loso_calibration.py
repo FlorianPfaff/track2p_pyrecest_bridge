@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 from bayescatrack.association.calibrated_costs import (
     DEFAULT_ASSOCIATION_FEATURES,
     ReferenceTrainingOptions,
@@ -20,14 +19,21 @@ from bayescatrack.association.pyrecest_global_assignment import (
     tracks_to_suite2p_index_matrix,
 )
 from bayescatrack.core.bridge import Track2pSession, load_track2p_subject
-from bayescatrack.evaluation.complete_track_scores import normalize_track_matrix, score_track_matrices
+from bayescatrack.evaluation.complete_track_scores import (
+    normalize_track_matrix,
+    score_track_matrices,
+)
 from bayescatrack.experiments.track2p_benchmark import (
     SubjectBenchmarkResult,
     Track2pBenchmarkConfig,
     discover_subject_dirs,
     solve_configured_global_assignment,
 )
-from bayescatrack.reference import Track2pReference, load_aligned_subject_reference, load_track2p_reference
+from bayescatrack.reference import (
+    Track2pReference,
+    load_aligned_subject_reference,
+    load_track2p_reference,
+)
 
 
 @dataclass(frozen=True)
@@ -94,17 +100,24 @@ def run_track2p_loso_calibration(
     """Run calibrated global assignment with leave-one-subject-out model fitting."""
 
     if config.method != "global-assignment" or config.cost != "calibrated":
-        raise ValueError("LOSO calibration requires method='global-assignment' and cost='calibrated'")
+        raise ValueError(
+            "LOSO calibration requires method='global-assignment' and cost='calibrated'"
+        )
 
     subject_dirs = tuple(discover_subject_dirs(config.data))
     if len(subject_dirs) < 2:
         raise ValueError("LOSO calibration requires at least two subject directories")
 
-    subjects = tuple(_load_subject_calibration_data(subject_dir, config=config) for subject_dir in subject_dirs)
+    subjects = tuple(
+        _load_subject_calibration_data(subject_dir, config=config)
+        for subject_dir in subject_dirs
+    )
     feature_names = tuple(feature_names)
     folds: list[LosoCalibrationFold] = []
     for held_out_index, held_out in enumerate(subjects):
-        training_subjects = tuple(subject for index, subject in enumerate(subjects) if index != held_out_index)
+        training_subjects = tuple(
+            subject for index, subject in enumerate(subjects) if index != held_out_index
+        )
         training_features, training_labels = _collect_training_examples(
             training_subjects,
             config=config,
@@ -123,18 +136,27 @@ def run_track2p_loso_calibration(
             cost="calibrated",
             calibrated_model=calibrated_model,
         )
-        predicted_matrix = tracks_to_suite2p_index_matrix(assignment.result.tracks, held_out.sessions)
-        scores = score_track_matrices(predicted_matrix, _reference_matrix(held_out.reference, curated_only=config.curated_only))
+        predicted_matrix = tracks_to_suite2p_index_matrix(
+            assignment.result.tracks, held_out.sessions
+        )
+        scores = score_track_matrices(
+            predicted_matrix,
+            _reference_matrix(held_out.reference, curated_only=config.curated_only),
+        )
         scores = {
             **scores,
             "training_examples": int(training_labels.shape[0]),
             "positive_examples": int(np.sum(training_labels)),
-            "negative_examples": int(training_labels.shape[0] - np.sum(training_labels)),
+            "negative_examples": int(
+                training_labels.shape[0] - np.sum(training_labels)
+            ),
         }
         folds.append(
             LosoCalibrationFold(
                 held_out_subject=held_out.subject_name,
-                training_subjects=tuple(subject.subject_name for subject in training_subjects),
+                training_subjects=tuple(
+                    subject.subject_name for subject in training_subjects
+                ),
                 benchmark=SubjectBenchmarkResult(
                     subject=held_out.subject_name,
                     variant="Calibrated costs + LOSO global assignment",
@@ -148,10 +170,14 @@ def run_track2p_loso_calibration(
             )
         )
 
-    return LosoCalibrationResult(folds=tuple(folds), feature_names=feature_names, max_gap=int(config.max_gap))
+    return LosoCalibrationResult(
+        folds=tuple(folds), feature_names=feature_names, max_gap=int(config.max_gap)
+    )
 
 
-def _load_subject_calibration_data(subject_dir: Path, *, config: Track2pBenchmarkConfig) -> SubjectCalibrationData:
+def _load_subject_calibration_data(
+    subject_dir: Path, *, config: Track2pBenchmarkConfig
+) -> SubjectCalibrationData:
     sessions = tuple(
         load_track2p_subject(
             subject_dir,
@@ -170,10 +196,14 @@ def _load_subject_calibration_data(subject_dir: Path, *, config: Track2pBenchmar
             f"Subject {subject_dir.name!r} has {len(sessions)} loaded sessions but "
             f"{reference.n_sessions} reference sessions"
         )
-    return SubjectCalibrationData(subject_dir=subject_dir, sessions=sessions, reference=reference)
+    return SubjectCalibrationData(
+        subject_dir=subject_dir, sessions=sessions, reference=reference
+    )
 
 
-def _load_training_reference(subject_dir: Path, *, config: Track2pBenchmarkConfig) -> Track2pReference:
+def _load_training_reference(
+    subject_dir: Path, *, config: Track2pBenchmarkConfig
+) -> Track2pReference:
     if config.reference is None:
         if not (subject_dir / "track2p" / "track_ops.npy").exists():
             return load_aligned_subject_reference(
@@ -181,12 +211,18 @@ def _load_training_reference(subject_dir: Path, *, config: Track2pBenchmarkConfi
                 plane_name=config.plane_name,
                 input_format=config.input_format,
             )
-        return load_track2p_reference(subject_dir / "track2p", plane_name=config.plane_name)
+        return load_track2p_reference(
+            subject_dir / "track2p", plane_name=config.plane_name
+        )
 
     for candidate in _reference_candidates(subject_dir, config.reference):
-        if (candidate / "track_ops.npy").exists() or (candidate / "track2p" / "track_ops.npy").exists():
+        if (candidate / "track_ops.npy").exists() or (
+            candidate / "track2p" / "track_ops.npy"
+        ).exists():
             return load_track2p_reference(candidate, plane_name=config.plane_name)
-    raise FileNotFoundError(f"Could not find Track2p reference for subject {subject_dir.name!r}")
+    raise FileNotFoundError(
+        f"Could not find Track2p reference for subject {subject_dir.name!r}"
+    )
 
 
 def _reference_candidates(subject_dir: Path, reference_root: Path) -> tuple[Path, ...]:
@@ -212,7 +248,9 @@ def _collect_training_examples(
         features, labels = collect_reference_training_examples(
             subject.sessions,
             subject.reference,
-            session_edges=session_edge_pairs(len(subject.sessions), max_gap=config.max_gap),
+            session_edges=session_edge_pairs(
+                len(subject.sessions), max_gap=config.max_gap
+            ),
             options=training_options,
         )
         feature_blocks.append(features)
@@ -223,7 +261,9 @@ def _collect_training_examples(
     return np.concatenate(feature_blocks, axis=0), np.concatenate(label_blocks, axis=0)
 
 
-def _reference_training_options(config: Track2pBenchmarkConfig, feature_names: Sequence[str]) -> ReferenceTrainingOptions:
+def _reference_training_options(
+    config: Track2pBenchmarkConfig, feature_names: Sequence[str]
+) -> ReferenceTrainingOptions:
     return ReferenceTrainingOptions(
         curated_only=config.curated_only,
         transform_type=config.transform_type,
@@ -241,5 +281,7 @@ def _reference_matrix(reference: Track2pReference, *, curated_only: bool) -> np.
     if not curated_only:
         return matrix
     if reference.curated_mask is None:
-        raise ValueError("curated_only was requested, but the reference has no curation mask")
+        raise ValueError(
+            "curated_only was requested, but the reference has no curation mask"
+        )
     return matrix[np.asarray(reference.curated_mask, dtype=bool)]

@@ -5,7 +5,6 @@ import types
 
 import numpy as np
 import pytest
-
 from bayescatrack.experiments.track2p_benchmark import (
     Track2pBenchmarkConfig,
     run_track2p_benchmark,
@@ -89,7 +88,9 @@ def _install_fake_pyrecest(monkeypatch):
     monkeypatch.setitem(sys.modules, "pyrecest", fake_pyrecest)
     monkeypatch.setitem(sys.modules, "pyrecest.utils", fake_utils)
     monkeypatch.setitem(sys.modules, "pyrecest.utils.association_models", fake_models)
-    monkeypatch.setitem(sys.modules, "pyrecest.utils.multisession_assignment", fake_assignment)
+    monkeypatch.setitem(
+        sys.modules, "pyrecest.utils.multisession_assignment", fake_assignment
+    )
 
 
 def _install_registration_passthrough(monkeypatch):
@@ -121,7 +122,9 @@ def _run_loso_calibration(tmp_path, monkeypatch, subject_writer):
     )
 
 
-def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_raw_npy_session):
+def test_loso_calibration_trains_on_other_subjects(
+    tmp_path, monkeypatch, write_raw_npy_session
+):
     results = _run_loso_calibration(
         tmp_path,
         monkeypatch,
@@ -139,7 +142,9 @@ def test_loso_calibration_trains_on_other_subjects(tmp_path, monkeypatch, write_
         assert row["negative_examples"] == 6
 
 
-def test_loso_calibration_uses_aligned_rows_when_track2p_reference_is_absent(tmp_path, monkeypatch, write_raw_npy_session):
+def test_loso_calibration_uses_aligned_rows_when_track2p_reference_is_absent(
+    tmp_path, monkeypatch, write_raw_npy_session
+):
     results = _run_loso_calibration(
         tmp_path,
         monkeypatch,
@@ -148,7 +153,10 @@ def test_loso_calibration_uses_aligned_rows_when_track2p_reference_is_absent(tmp
 
     assert [result.subject for result in results] == ["jm001", "jm002"]
     assert {result.reference_source for result in results} == {"aligned_subject_rows"}
-    assert [result.to_dict()["pairwise_f1"] for result in results] == [pytest.approx(1.0), pytest.approx(1.0)]
+    assert [result.to_dict()["pairwise_f1"] for result in results] == [
+        pytest.approx(1.0),
+        pytest.approx(1.0),
+    ]
 
 
 def test_loso_calibration_requires_calibrated_cost(tmp_path, write_raw_npy_session):

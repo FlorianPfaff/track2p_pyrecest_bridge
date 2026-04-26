@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from bayescatrack.evaluation.complete_track_scores import (
     complete_track_set,
     pairwise_track_set,
@@ -32,7 +31,12 @@ def test_complete_track_and_pairwise_scoring():
     )
 
     assert complete_track_set(reference) == {(0, 10, 20), (1, 11, 21)}
-    assert pairwise_track_set(predicted) == {(0, 1, 0, 10), (1, 2, 10, 20), (0, 1, 3, 13), (1, 2, 13, 23)}
+    assert pairwise_track_set(predicted) == {
+        (0, 1, 0, 10),
+        (1, 2, 10, 20),
+        (0, 1, 3, 13),
+        (1, 2, 13, 23),
+    }
 
     complete_scores = score_complete_tracks(predicted, reference)
     assert complete_scores["complete_track_true_positives"] == 1
@@ -60,7 +64,9 @@ def test_track2p_reference_scoring_can_filter_curated_rows():
     )
     predicted = np.array([[0, 10, 20], [1, 11, 21]], dtype=object)
 
-    scores = score_track_matrix_against_reference(predicted, reference, curated_only=True)
+    scores = score_track_matrix_against_reference(
+        predicted, reference, curated_only=True
+    )
 
     assert scores["complete_track_precision"] == pytest.approx(0.5)
     assert scores["complete_track_recall"] == pytest.approx(1.0)
