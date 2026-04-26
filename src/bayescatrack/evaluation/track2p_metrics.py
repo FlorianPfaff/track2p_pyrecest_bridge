@@ -1,10 +1,8 @@
 """Track2p benchmark metric facade."""
 
-# pylint: disable=undefined-all-variable
+# pylint: disable=wildcard-import,unused-wildcard-import
 
 from __future__ import annotations
 
-from . import complete_track_scores as _scores
-
-__all__ = _scores.__all__
-globals().update({name: getattr(_scores, name) for name in __all__})
+from .complete_track_scores import *  # noqa: F401,F403
+from .complete_track_scores import __all__ as __all__  # noqa: F401
