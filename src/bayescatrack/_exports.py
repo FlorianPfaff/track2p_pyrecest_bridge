@@ -47,6 +47,8 @@ REFERENCE_PUBLIC_NAMES = _public_names(
     "load_aligned_subject_reference",
     "load_track2p_reference",
     "pairs_from_label_vectors",
+    "score_complete_tracks",
+    "score_complete_tracks_against_reference",
     "score_label_vectors_against_reference",
     "score_pairwise_matches",
 )
@@ -67,6 +69,11 @@ TRACK2P_REGISTRATION_PUBLIC_NAMES = _public_names(
     "build_registered_subject_association_bundles",
     "register_consecutive_session_measurement_planes",
     "register_plane_pair",
+)
+
+TRACKING_PUBLIC_NAMES = _public_names(
+    "SubjectTrackingResult",
+    "run_registered_subject_tracking",
 )
 
 

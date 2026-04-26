@@ -108,7 +108,9 @@ def build_registered_pairwise_costs(
         )
         if cost == "calibrated":
             assert calibrated_model is not None
-            pairwise_costs[(source_session, target_session)] = calibrated_cost_matrix_from_bundle(bundle, calibrated_model)
+            pairwise_costs[(source_session, target_session)] = calibrated_cost_matrix_from_bundle(
+                bundle, calibrated_model
+            )
         else:
             pairwise_costs[(source_session, target_session)] = np.asarray(bundle.pairwise_cost_matrix, dtype=float)
     return pairwise_costs
@@ -158,7 +160,12 @@ def solve_global_assignment_for_sessions(
         gap_penalty=float(gap_penalty),
         cost_threshold=cost_threshold,
     )
-    return GlobalAssignmentRun(result=result, pairwise_costs=pairwise_costs, session_sizes=session_sizes, session_edges=session_edges)
+    return GlobalAssignmentRun(
+        result=result,
+        pairwise_costs=pairwise_costs,
+        session_sizes=session_sizes,
+        session_edges=session_edges,
+    )
 
 
 def tracks_to_suite2p_index_matrix(tracks: Sequence[Mapping[int, int]], sessions: Sequence[Track2pSession]) -> np.ndarray:

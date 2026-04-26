@@ -21,7 +21,7 @@ from bayescatrack.association.pyrecest_global_assignment import (
     tracks_to_suite2p_index_matrix,
 )
 from bayescatrack.core.bridge import Track2pSession, find_track2p_session_dirs, load_track2p_subject
-from bayescatrack.evaluation.complete_track_scores import normalize_track_matrix, score_track_matrices
+from bayescatrack.evaluation.track2p_metrics import normalize_track_matrix, score_track_matrices
 from bayescatrack.reference import Track2pReference, load_aligned_subject_reference, load_track2p_reference
 
 BenchmarkMethod = Literal["track2p-baseline", "global-assignment"]
@@ -171,11 +171,31 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Run Track2p baseline and global-assignment ablations on Track2p-style datasets.",
     )
     parser.add_argument("--data", required=True, type=Path, help="Track2p dataset root or one subject directory")
-    parser.add_argument("--method", required=True, choices=("track2p-baseline", "global-assignment"), help="Benchmark variant to run")
-    parser.add_argument("--split", default="subject", choices=("subject", "leave-one-subject-out"), help="Evaluation split policy")
+    parser.add_argument(
+        "--method",
+        required=True,
+        choices=("track2p-baseline", "global-assignment"),
+        help="Benchmark variant to run",
+    )
+    parser.add_argument(
+        "--split",
+        default="subject",
+        choices=("subject", "leave-one-subject-out"),
+        help="Evaluation split policy",
+    )
     parser.add_argument("--plane", dest="plane_name", default="plane0", help="Plane name such as plane0")
-    parser.add_argument("--input-format", default="auto", choices=("auto", "suite2p", "npy"), help="Input format for loading sessions")
-    parser.add_argument("--reference", type=Path, default=None, help="Optional ground-truth root, subject directory, or track2p folder")
+    parser.add_argument(
+        "--input-format",
+        default="auto",
+        choices=("auto", "suite2p", "npy"),
+        help="Input format for loading sessions",
+    )
+    parser.add_argument(
+        "--reference",
+        type=Path,
+        default=None,
+        help="Optional ground-truth root, subject directory, or track2p folder",
+    )
     parser.add_argument("--curated-only", action="store_true", help="Evaluate only reference tracks marked curated")
     parser.add_argument(
         "--cost",
@@ -184,13 +204,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Pairwise cost used by global assignment",
     )
     parser.add_argument("--max-gap", type=int, default=2, help="Maximum forward session gap for global-assignment edges")
-    parser.add_argument("--transform-type", default="affine", choices=("affine", "rigid"), help="Track2p registration transform type")
+    parser.add_argument(
+        "--transform-type",
+        default="affine",
+        choices=("affine", "rigid"),
+        help="Track2p registration transform type",
+    )
     parser.add_argument("--start-cost", type=float, default=5.0, help="PyRecEst track start cost")
     parser.add_argument("--end-cost", type=float, default=5.0, help="PyRecEst track end cost")
     parser.add_argument("--gap-penalty", type=float, default=1.0, help="Penalty per skipped session")
     parser.add_argument("--cost-threshold", type=float, default=6.0, help="Maximum adjusted edge cost admitted by the solver")
     parser.add_argument("--no-cost-threshold", action="store_true", help="Disable the solver edge-cost threshold")
-    parser.add_argument("--include-behavior", action=argparse.BooleanOptionalAction, default=True, help="Load behaviour arrays when present")
+    parser.add_argument(
+        "--include-behavior",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Load behaviour arrays when present",
+    )
     parser.add_argument("--include-non-cells", action="store_true", help="Keep Suite2p ROIs that fail iscell filtering")
     parser.add_argument("--cell-probability-threshold", type=float, default=0.5, help="Suite2p iscell probability threshold")
     parser.add_argument("--weighted-masks", action="store_true", help="Use Suite2p lam weights while reconstructing masks")
