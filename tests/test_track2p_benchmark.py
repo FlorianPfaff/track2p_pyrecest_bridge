@@ -9,7 +9,7 @@ import pytest
 from bayescatrack.experiments.track2p_benchmark import Track2pBenchmarkConfig, format_benchmark_table, run_track2p_benchmark
 
 
-def _write_subject(subject_dir, write_raw_npy_session):
+def _write_subject(subject_dir, write_raw_npy_session, *, write_reference=True):
     masks_a = np.zeros((2, 4, 4), dtype=bool)
     masks_a[0, 0:2, 0:2] = True
     masks_a[1, 2:4, 2:4] = True
@@ -19,6 +19,9 @@ def _write_subject(subject_dir, write_raw_npy_session):
     write_raw_npy_session(subject_dir, "2024-05-01_a", masks_a, offset=0.0)
     write_raw_npy_session(subject_dir, "2024-05-02_a", masks_b, offset=10.0)
     write_raw_npy_session(subject_dir, "2024-05-03_a", masks_c, offset=20.0)
+
+    if not write_reference:
+        return
 
     track2p_dir = subject_dir / "track2p"
     track2p_dir.mkdir()
@@ -77,6 +80,19 @@ def test_track2p_baseline_benchmark_scores_track2p_output(tmp_path, write_raw_np
     assert result["complete_track_f1"] == pytest.approx(1.0)
     assert result["complete_tracks"] == 2
     assert "Track2p default" in format_benchmark_table([result])
+
+
+def test_track2p_baseline_benchmark_scores_aligned_rows_without_track2p_output(tmp_path, write_raw_npy_session):
+    subject_dir = tmp_path / "jm001"
+    _write_subject(subject_dir, write_raw_npy_session, write_reference=False)
+
+    rows = run_track2p_benchmark(Track2pBenchmarkConfig(data=tmp_path, method="track2p-baseline"))
+
+    result = rows[0].to_dict()
+    assert result["variant"] == "Track2p default"
+    assert result["reference_source"] == "aligned_subject_rows"
+    assert result["pairwise_f1"] == pytest.approx(1.0)
+    assert result["complete_track_f1"] == pytest.approx(1.0)
 
 
 def test_global_assignment_benchmark_uses_skip_edges(tmp_path, monkeypatch, write_raw_npy_session):
