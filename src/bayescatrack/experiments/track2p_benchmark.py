@@ -284,7 +284,15 @@ def main(argv: list[str] | None = None) -> int:
 
 def _predict_subject_tracks(subject_dir: Path, config: Track2pBenchmarkConfig) -> tuple[np.ndarray, str]:
     if config.method == "track2p-baseline":
-        baseline = load_track2p_reference(subject_dir / "track2p", plane_name=config.plane_name)
+        track2p_dir = subject_dir / "track2p"
+        if track2p_dir.exists():
+            baseline = load_track2p_reference(track2p_dir, plane_name=config.plane_name)
+        else:
+            baseline = load_aligned_subject_reference(
+                subject_dir,
+                plane_name=config.plane_name,
+                input_format=config.input_format,
+            )
         return normalize_track_matrix(baseline.suite2p_indices), "Track2p default"
 
     sessions = load_track2p_subject(
