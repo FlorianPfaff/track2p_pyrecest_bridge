@@ -33,14 +33,21 @@ def load_labeled_rows(inputs: Sequence[ComparisonInput]) -> list[dict[str, str]]
     return rows
 
 
-def aggregate_rows(rows: Sequence[dict[str, str]]) -> list[dict[str, float | int | str]]:
+def aggregate_rows(
+    rows: Sequence[dict[str, str]],
+) -> list[dict[str, float | int | str]]:
     """Aggregate subject-level benchmark rows by approach."""
 
     labels = tuple(dict.fromkeys(row["approach"] for row in rows))
-    return [_aggregate_approach(label, [row for row in rows if row["approach"] == label]) for label in labels]
+    return [
+        _aggregate_approach(label, [row for row in rows if row["approach"] == label])
+        for label in labels
+    ]
 
 
-def write_comparison(rows: Sequence[dict[str, float | int | str]], output_path: Path, output_format: str) -> None:
+def write_comparison(
+    rows: Sequence[dict[str, float | int | str]], output_path: Path, output_format: str
+) -> None:
     """Write aggregate comparison rows as Markdown or CSV."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -71,7 +78,9 @@ def format_markdown_table(rows: Sequence[dict[str, float | int | str]]) -> str:
     separator = "| " + " | ".join(["---"] + ["---:"] * (len(columns) - 1)) + " |"
     body = [header, separator]
     for row in rows:
-        body.append("| " + " | ".join(_format_value(row[column]) for column in columns) + " |")
+        body.append(
+            "| " + " | ".join(_format_value(row[column]) for column in columns) + " |"
+        )
     return "\n".join(body)
 
 
@@ -89,8 +98,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         metavar="LABEL=CSV",
         help="Labeled benchmark CSV to include; repeat for each approach",
     )
-    parser.add_argument("--output", type=Path, default=None, help="Optional output table path")
-    parser.add_argument("--format", choices=("markdown", "csv"), default="markdown", help="Output table format")
+    parser.add_argument(
+        "--output", type=Path, default=None, help="Optional output table path"
+    )
+    parser.add_argument(
+        "--format",
+        choices=("markdown", "csv"),
+        default="markdown",
+        help="Output table format",
+    )
     return parser
 
 
@@ -122,7 +138,9 @@ def _parse_input_spec(spec: str) -> ComparisonInput:
     return ComparisonInput(label=label, path=Path(path_text))
 
 
-def _aggregate_approach(label: str, rows: Sequence[dict[str, str]]) -> dict[str, float | int | str]:
+def _aggregate_approach(
+    label: str, rows: Sequence[dict[str, str]]
+) -> dict[str, float | int | str]:
     return {
         "approach": label,
         "subjects": len(rows),

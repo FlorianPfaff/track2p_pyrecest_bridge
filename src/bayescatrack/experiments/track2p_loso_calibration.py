@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 from bayescatrack.association.calibrated_costs import (
     DEFAULT_ASSOCIATION_FEATURES,
     ReferenceTrainingOptions,
@@ -25,12 +24,12 @@ from bayescatrack.experiments.track2p_benchmark import (
     ProgressReporter,
     SubjectBenchmarkResult,
     Track2pBenchmarkConfig,
-    discover_subject_dirs,
     _load_reference_for_subject,
     _load_subject_sessions,
     _score_prediction_against_reference,
     _validate_reference_for_benchmark,
     _validate_reference_roi_indices,
+    discover_subject_dirs,
     solve_configured_global_assignment,
 )
 from bayescatrack.reference import Track2pReference
@@ -100,7 +99,9 @@ def run_track2p_loso_calibration(
     """Run calibrated global assignment with leave-one-subject-out model fitting."""
 
     if config.method != "global-assignment" or config.cost != "calibrated":
-        raise ValueError("LOSO calibration requires method='global-assignment' and cost='calibrated'")
+        raise ValueError(
+            "LOSO calibration requires method='global-assignment' and cost='calibrated'"
+        )
 
     subject_dirs = tuple(discover_subject_dirs(config.data))
     if len(subject_dirs) < 2:
@@ -116,7 +117,9 @@ def run_track2p_loso_calibration(
     feature_names = tuple(feature_names)
     folds: list[LosoCalibrationFold] = []
     for held_out_index, held_out in enumerate(subjects):
-        training_subjects = tuple(subject for index, subject in enumerate(subjects) if index != held_out_index)
+        training_subjects = tuple(
+            subject for index, subject in enumerate(subjects) if index != held_out_index
+        )
         training_features, training_labels = _collect_training_examples(
             training_subjects,
             config=config,
@@ -139,18 +142,26 @@ def run_track2p_loso_calibration(
             cost="calibrated",
             calibrated_model=calibrated_model,
         )
-        predicted_matrix = tracks_to_suite2p_index_matrix(assignment.result.tracks, held_out.sessions)
-        scores = _score_prediction_against_reference(predicted_matrix, held_out.reference, config=config)
+        predicted_matrix = tracks_to_suite2p_index_matrix(
+            assignment.result.tracks, held_out.sessions
+        )
+        scores = _score_prediction_against_reference(
+            predicted_matrix, held_out.reference, config=config
+        )
         scores = {
             **scores,
             "training_examples": int(training_labels.shape[0]),
             "positive_examples": int(np.sum(training_labels)),
-            "negative_examples": int(training_labels.shape[0] - np.sum(training_labels)),
+            "negative_examples": int(
+                training_labels.shape[0] - np.sum(training_labels)
+            ),
         }
         folds.append(
             LosoCalibrationFold(
                 held_out_subject=held_out.subject_name,
-                training_subjects=tuple(subject.subject_name for subject in training_subjects),
+                training_subjects=tuple(
+                    subject.subject_name for subject in training_subjects
+                ),
                 benchmark=SubjectBenchmarkResult(
                     subject=held_out.subject_name,
                     variant="Calibrated costs + LOSO global assignment",
@@ -164,12 +175,18 @@ def run_track2p_loso_calibration(
             )
         )
 
-    return LosoCalibrationResult(folds=tuple(folds), feature_names=feature_names, max_gap=int(config.max_gap))
+    return LosoCalibrationResult(
+        folds=tuple(folds), feature_names=feature_names, max_gap=int(config.max_gap)
+    )
 
 
-def _load_subject_calibration_data(subject_dir: Path, *, config: Track2pBenchmarkConfig) -> SubjectCalibrationData:
+def _load_subject_calibration_data(
+    subject_dir: Path, *, config: Track2pBenchmarkConfig
+) -> SubjectCalibrationData:
     sessions = tuple(_load_subject_sessions(subject_dir, config))
-    reference = _load_reference_for_subject(subject_dir, data_root=config.data, config=config)
+    reference = _load_reference_for_subject(
+        subject_dir, data_root=config.data, config=config
+    )
     _validate_reference_for_benchmark(reference, subject_dir=subject_dir, config=config)
     if reference.source == GROUND_TRUTH_REFERENCE_SOURCE:
         _validate_reference_roi_indices(reference, sessions)
@@ -178,7 +195,9 @@ def _load_subject_calibration_data(subject_dir: Path, *, config: Track2pBenchmar
             f"Subject {subject_dir.name!r} has {len(sessions)} loaded sessions but "
             f"{reference.n_sessions} reference sessions"
         )
-    return SubjectCalibrationData(subject_dir=subject_dir, sessions=sessions, reference=reference)
+    return SubjectCalibrationData(
+        subject_dir=subject_dir, sessions=sessions, reference=reference
+    )
 
 
 # pylint: disable=too-many-arguments
@@ -195,11 +214,15 @@ def _collect_training_examples(
     training_options = _reference_training_options(config, feature_names)
     for subject in training_subjects:
         if progress is not None:
-            progress.step(f"collecting {subject.subject_name} training features for {held_out_subject}")
+            progress.step(
+                f"collecting {subject.subject_name} training features for {held_out_subject}"
+            )
         features, labels = collect_reference_training_examples(
             subject.sessions,
             subject.reference,
-            session_edges=session_edge_pairs(len(subject.sessions), max_gap=config.max_gap),
+            session_edges=session_edge_pairs(
+                len(subject.sessions), max_gap=config.max_gap
+            ),
             options=training_options,
         )
         feature_blocks.append(features)
@@ -210,7 +233,9 @@ def _collect_training_examples(
     return np.concatenate(feature_blocks, axis=0), np.concatenate(label_blocks, axis=0)
 
 
-def _reference_training_options(config: Track2pBenchmarkConfig, feature_names: Sequence[str]) -> ReferenceTrainingOptions:
+def _reference_training_options(
+    config: Track2pBenchmarkConfig, feature_names: Sequence[str]
+) -> ReferenceTrainingOptions:
     return ReferenceTrainingOptions(
         curated_only=config.curated_only,
         transform_type=config.transform_type,
