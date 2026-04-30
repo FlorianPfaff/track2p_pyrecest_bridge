@@ -1,6 +1,7 @@
 name: Track2p benchmark comparison
 
 on:
+  # checkov:skip=CKV_GHA_7: Manual benchmark workflow intentionally exposes bounded dispatch inputs and produces only benchmark artifacts.
   workflow_dispatch:
     inputs:
       data_mode:
