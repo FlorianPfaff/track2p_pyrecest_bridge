@@ -371,6 +371,7 @@ def _variant_name(cost: AssociationCost) -> str:
     return "BayesCaTrack costs + global assignment"
 
 
+# pylint: disable=too-many-return-statements,too-many-branches
 def _load_reference_for_subject(subject_dir: Path, *, data_root: Path, config: Track2pBenchmarkConfig) -> Track2pReference:
     data_root = Path(data_root)
     if config.reference is None:
