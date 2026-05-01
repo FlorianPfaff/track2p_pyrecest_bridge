@@ -1,0 +1,14 @@
+name: Track2p benchmark
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain setup
+        run: echo "Add benchmark job body after review"
