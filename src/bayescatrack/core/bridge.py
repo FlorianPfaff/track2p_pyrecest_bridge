@@ -4,8 +4,12 @@
 
 from .._exports import BRIDGE_PUBLIC_NAMES
 from . import _bridge_impl
+from .mahalanobis import pairwise_mahalanobis_centroid_distances
 
 CalciumPlaneData = _bridge_impl.CalciumPlaneData
+CalciumPlaneData.pairwise_mahalanobis_centroid_distances = (  # type: ignore[attr-defined]
+    pairwise_mahalanobis_centroid_distances
+)
 SessionAssociationBundle = _bridge_impl.SessionAssociationBundle
 Track2pSession = _bridge_impl.Track2pSession
 build_consecutive_session_association_bundles = (
