@@ -32,6 +32,7 @@ def add_activity_similarity_components(
     return pairwise_components
 
 
+# pylint: disable=too-many-locals
 def activity_similarity_components(
     reference_plane: Any,
     measurement_plane: Any,
