@@ -23,7 +23,7 @@ on:
         default: ""
         required: false
       require_ground_truth_csv:
-        description: "Fail before benchmarking if no ground_truth.csv files are found"
+        description: "Filter to subjects with manual ground_truth.csv; fail if none are found"
         type: boolean
         default: true
         required: true
@@ -158,34 +158,46 @@ jobs:
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
+          import shutil
+          import sys
           from pathlib import Path
+
+          GROUND_TRUTH_CSV_NAME = "ground_truth.csv"
+          FILTERED_ROOT = Path("benchmark-ground-truth-subjects")
+
+          def _has_suite2p_session_child(path: Path) -> bool:
+              return any((child / "suite2p" / "plane0").exists() for child in path.iterdir() if child.is_dir())
+
+          def _looks_like_subject_dir(path: Path) -> bool:
+              if not path.exists() or not path.is_dir():
+                  return False
+              return (path / "track2p").exists() or _has_suite2p_session_child(path)
 
           def find_subject_dirs(root: Path) -> list[Path]:
               if not root.exists():
                   return []
-              candidates = []
+              candidates: list[Path] = []
               roots = [root]
               # Handle archives that extract into one nested top-level directory such as data/.
               roots.extend(child for child in root.iterdir() if child.is_dir())
-              seen = set()
+              seen: set[Path] = set()
               for base in roots:
                   for path in [base, *base.rglob("*")]:
                       if not path.is_dir() or path in seen:
                           continue
                       seen.add(path)
-                      has_track2p = (path / "track2p").exists()
-                      has_sessions = any((child / "suite2p" / "plane0").exists() for child in path.iterdir() if child.is_dir())
-                      if has_track2p or has_sessions:
+                      if _looks_like_subject_dir(path):
                           candidates.append(path)
-              # Prefer the shallowest root that has at least one subject child.
+
+              # Prefer the shallowest root that has Track2p subject children.
               subject_roots = []
               for candidate in candidates:
-                  children = [child for child in candidate.iterdir() if child.is_dir() and ((child / "track2p").exists() or any((session / "suite2p" / "plane0").exists() for session in child.iterdir() if session.is_dir()))]
+                  children = [child for child in candidate.iterdir() if child.is_dir() and _looks_like_subject_dir(child)]
                   if children:
                       subject_roots.append(candidate)
               if subject_roots:
                   best_root = sorted(subject_roots, key=lambda path: (len(path.parts), str(path)))[0]
-                  return [child for child in best_root.iterdir() if child.is_dir() and ((child / "track2p").exists() or any((session / "suite2p" / "plane0").exists() for session in child.iterdir() if session.is_dir()))]
+                  return [child for child in best_root.iterdir() if child.is_dir() and _looks_like_subject_dir(child)]
               return sorted(candidates, key=lambda path: str(path))
 
           def find_data_root(requested: Path) -> Path:
@@ -198,6 +210,52 @@ jobs:
                       return child
               raise SystemExit(f"Could not discover Track2p-style subject directories under {requested}")
 
+          def ground_truth_files(reference_root: Path) -> list[Path]:
+              if reference_root.is_file():
+                  return [reference_root] if reference_root.name == GROUND_TRUTH_CSV_NAME else []
+              return sorted(reference_root.rglob(GROUND_TRUTH_CSV_NAME))
+
+          def resolve_subject_ground_truth(subject_dir: Path, *, data_root: Path, reference_root: Path, all_ground_truth_files: list[Path]) -> Path | None:
+              candidates: list[Path] = []
+              if reference_root.is_file():
+                  candidates.append(reference_root)
+              else:
+                  candidates.extend(
+                      [
+                          reference_root / GROUND_TRUTH_CSV_NAME,
+                          reference_root / subject_dir.name / GROUND_TRUTH_CSV_NAME,
+                      ]
+                  )
+                  try:
+                      relative_subject = subject_dir.relative_to(data_root)
+                  except ValueError:
+                      relative_subject = None
+                  if relative_subject is not None:
+                      candidates.append(reference_root / relative_subject / GROUND_TRUTH_CSV_NAME)
+
+                  # Also support a separate reference root laid out as */<subject>/ground_truth.csv.
+                  candidates.extend(path for path in all_ground_truth_files if path.parent.name == subject_dir.name)
+
+              seen: set[Path] = set()
+              for candidate in candidates:
+                  candidate = candidate.resolve() if candidate.exists() else candidate
+                  if candidate in seen:
+                      continue
+                  seen.add(candidate)
+                  if candidate.exists() and candidate.is_file() and candidate.name == GROUND_TRUTH_CSV_NAME:
+                      return candidate
+              return None
+
+          def symlink_subject_with_ground_truth(subject_dir: Path, ground_truth_path: Path, *, filtered_root: Path) -> Path:
+              target_subject = filtered_root / subject_dir.name
+              target_subject.mkdir(parents=True, exist_ok=False)
+              for item in subject_dir.iterdir():
+                  if item.name == GROUND_TRUTH_CSV_NAME:
+                      continue
+                  os.symlink(item.resolve(), target_subject / item.name, target_is_directory=item.is_dir())
+              os.symlink(ground_truth_path.resolve(), target_subject / GROUND_TRUTH_CSV_NAME)
+              return target_subject
+
           data_root = find_data_root(Path(os.environ["DATA_PATH"]))
           reference_text = os.environ.get("REFERENCE_PATH", "").strip()
           reference_root = Path(reference_text) if reference_text else data_root
@@ -205,43 +263,116 @@ jobs:
               raise SystemExit(f"Reference path does not exist: {reference_root}")
 
           subject_dirs = find_subject_dirs(data_root)
-          ground_truth_files = sorted(reference_root.rglob("ground_truth.csv")) if reference_root.is_dir() else ([reference_root] if reference_root.name == "ground_truth.csv" else [])
-          if os.environ["REQUIRE_GROUND_TRUTH_CSV"].lower() == "true" and not ground_truth_files:
+          if reference_root.is_file() and len(subject_dirs) != 1:
               raise SystemExit(
-                  "No ground_truth.csv files were found in the reference path. "
-                  "For paper-facing runs, pass --reference to independent ground truth or disable require_ground_truth_csv only for smoke tests."
+                  "A single ground_truth.csv reference file can only be used when the data root resolves to one subject. "
+                  "Use a reference root with one ground_truth.csv per subject for multi-subject benchmarks."
               )
-          if os.environ["RUN_CALIBRATED_LOSO"].lower() == "true" and len(subject_dirs) < 2:
-              raise SystemExit("Calibrated LOSO requires at least two discovered subjects")
 
-          print(f"data_root={data_root.as_posix()}")
-          print(f"reference_root={reference_root.as_posix()}")
-          print(f"subject_count={len(subject_dirs)}")
-          print(f"ground_truth_count={len(ground_truth_files)}")
+          all_ground_truth_files = ground_truth_files(reference_root)
+          require_ground_truth = os.environ["REQUIRE_GROUND_TRUTH_CSV"].lower() == "true"
+          run_loso = os.environ["RUN_CALIBRATED_LOSO"].lower() == "true"
+
+          raw_subject_names = [path.name for path in subject_dirs]
+          included: list[tuple[Path, Path]] = []
+          excluded: list[Path] = []
+          for subject_dir in subject_dirs:
+              ground_truth_path = resolve_subject_ground_truth(
+                  subject_dir,
+                  data_root=data_root,
+                  reference_root=reference_root,
+                  all_ground_truth_files=all_ground_truth_files,
+              )
+              if ground_truth_path is None:
+                  excluded.append(subject_dir)
+              else:
+                  included.append((subject_dir, ground_truth_path))
+
+          if require_ground_truth:
+              if not included:
+                  raise SystemExit(
+                      "No subject-specific ground_truth.csv files were found. "
+                      "For paper-facing runs, pass reference_path to a manual ground-truth root. "
+                      "For plumbing checks only, disable require_ground_truth_csv."
+                  )
+              if run_loso and len(included) < 2:
+                  raise SystemExit("Calibrated LOSO requires at least two subjects with ground_truth.csv")
+
+              if FILTERED_ROOT.exists():
+                  shutil.rmtree(FILTERED_ROOT)
+              FILTERED_ROOT.mkdir(parents=True)
+              for subject_dir, ground_truth_path in included:
+                  symlink_subject_with_ground_truth(subject_dir, ground_truth_path, filtered_root=FILTERED_ROOT)
+
+              benchmark_data_root = FILTERED_ROOT
+              benchmark_reference_root = FILTERED_ROOT
+              benchmark_subject_names = [subject_dir.name for subject_dir, _ in included]
+              reference_mode = "manual-gt"
+          else:
+              if run_loso and len(subject_dirs) < 2:
+                  raise SystemExit("Calibrated LOSO requires at least two discovered subjects")
+              benchmark_data_root = data_root
+              benchmark_reference_root = reference_root
+              benchmark_subject_names = raw_subject_names
+              reference_mode = "smoke"
+
+          included_names = [subject_dir.name for subject_dir, _ in included]
+          excluded_names = [subject_dir.name for subject_dir in excluded]
+          print(f"Raw subjects: {', '.join(raw_subject_names) or '<none>'}", file=sys.stderr)
+          print(f"Subjects with ground_truth.csv: {', '.join(included_names) or '<none>'}", file=sys.stderr)
+          print(f"Subjects without ground_truth.csv: {', '.join(excluded_names) or '<none>'}", file=sys.stderr)
+          print(f"Benchmark subjects: {', '.join(benchmark_subject_names) or '<none>'}", file=sys.stderr)
+          print(f"Benchmark data root: {benchmark_data_root}", file=sys.stderr)
+          print(f"Benchmark reference root: {benchmark_reference_root}", file=sys.stderr)
+
+          print(f"data_root={benchmark_data_root.as_posix()}")
+          print(f"reference_root={benchmark_reference_root.as_posix()}")
+          print(f"subject_count={len(benchmark_subject_names)}")
+          print(f"raw_subject_count={len(subject_dirs)}")
+          print(f"ground_truth_count={len(all_ground_truth_files)}")
+          print(f"included_subjects={','.join(included_names)}")
+          print(f"excluded_subjects={','.join(excluded_names)}")
+          print(f"reference_mode={reference_mode}")
           PY
 
       - name: Print benchmark input summary
         run: |
-          echo "Data root:      ${{ steps.paths.outputs.data_root }}"
-          echo "Reference root: ${{ steps.paths.outputs.reference_root }}"
-          echo "Subjects:       ${{ steps.paths.outputs.subject_count }}"
+          echo "Data root:              ${{ steps.paths.outputs.data_root }}"
+          echo "Reference root:         ${{ steps.paths.outputs.reference_root }}"
+          echo "Benchmark subjects:     ${{ steps.paths.outputs.subject_count }}"
+          echo "Raw discovered subjects: ${{ steps.paths.outputs.raw_subject_count }}"
           echo "ground_truth.csv files: ${{ steps.paths.outputs.ground_truth_count }}"
+          echo "Included subjects:      ${{ steps.paths.outputs.included_subjects }}"
+          echo "Excluded subjects:      ${{ steps.paths.outputs.excluded_subjects }}"
+          echo "Reference mode:         ${{ steps.paths.outputs.reference_mode }}"
 
       - name: Run Track2p baseline
         run: |
           mkdir -p results
+          reference_args=(--reference "${{ steps.paths.outputs.reference_root }}")
+          if [[ "${{ steps.paths.outputs.reference_mode }}" == "manual-gt" ]]; then
+            reference_args+=(--reference-kind manual-gt)
+          else
+            reference_args+=(--allow-track2p-as-reference-for-smoke-test)
+          fi
           bayescatrack benchmark track2p \
             --data "${{ steps.paths.outputs.data_root }}" \
-            --reference "${{ steps.paths.outputs.reference_root }}" \
+            "${reference_args[@]}" \
             --method track2p-baseline \
             --format csv \
             --output results/track2p_baseline.csv
 
       - name: Run registered-IoU global assignment
         run: |
+          reference_args=(--reference "${{ steps.paths.outputs.reference_root }}")
+          if [[ "${{ steps.paths.outputs.reference_mode }}" == "manual-gt" ]]; then
+            reference_args+=(--reference-kind manual-gt)
+          else
+            reference_args+=(--allow-track2p-as-reference-for-smoke-test)
+          fi
           bayescatrack benchmark track2p \
             --data "${{ steps.paths.outputs.data_root }}" \
-            --reference "${{ steps.paths.outputs.reference_root }}" \
+            "${reference_args[@]}" \
             --method global-assignment \
             --cost registered-iou \
             --max-gap "${{ inputs.max_gap }}" \
@@ -250,9 +381,15 @@ jobs:
 
       - name: Run ROI-aware global assignment
         run: |
+          reference_args=(--reference "${{ steps.paths.outputs.reference_root }}")
+          if [[ "${{ steps.paths.outputs.reference_mode }}" == "manual-gt" ]]; then
+            reference_args+=(--reference-kind manual-gt)
+          else
+            reference_args+=(--allow-track2p-as-reference-for-smoke-test)
+          fi
           bayescatrack benchmark track2p \
             --data "${{ steps.paths.outputs.data_root }}" \
-            --reference "${{ steps.paths.outputs.reference_root }}" \
+            "${reference_args[@]}" \
             --method global-assignment \
             --cost roi-aware \
             --max-gap "${{ inputs.max_gap }}" \
@@ -264,9 +401,15 @@ jobs:
       - name: Run calibrated LOSO global assignment
         if: inputs.run_calibrated_loso
         run: |
+          reference_args=(--reference "${{ steps.paths.outputs.reference_root }}")
+          if [[ "${{ steps.paths.outputs.reference_mode }}" == "manual-gt" ]]; then
+            reference_args+=(--reference-kind manual-gt)
+          else
+            reference_args+=(--allow-track2p-as-reference-for-smoke-test)
+          fi
           bayescatrack benchmark track2p \
             --data "${{ steps.paths.outputs.data_root }}" \
-            --reference "${{ steps.paths.outputs.reference_root }}" \
+            "${reference_args[@]}" \
             --method global-assignment \
             --cost calibrated \
             --split leave-one-subject-out \
@@ -306,8 +449,12 @@ jobs:
             echo
             echo "- Data root: \`${{ steps.paths.outputs.data_root }}\`"
             echo "- Reference root: \`${{ steps.paths.outputs.reference_root }}\`"
-            echo "- Subjects: \`${{ steps.paths.outputs.subject_count }}\`"
+            echo "- Benchmark subjects: \`${{ steps.paths.outputs.subject_count }}\`"
+            echo "- Raw discovered subjects: \`${{ steps.paths.outputs.raw_subject_count }}\`"
             echo "- ground_truth.csv files: \`${{ steps.paths.outputs.ground_truth_count }}\`"
+            echo "- Included subjects: \`${{ steps.paths.outputs.included_subjects }}\`"
+            echo "- Excluded subjects: \`${{ steps.paths.outputs.excluded_subjects }}\`"
+            echo "- Reference mode: \`${{ steps.paths.outputs.reference_mode }}\`"
             echo "- max_gap: \`${{ inputs.max_gap }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
