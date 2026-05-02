@@ -179,7 +179,12 @@ def _semicolon_encoded_row(
 ) -> list[int] | None:
     """Return a semicolon-encoded track row, if the CSV row uses that representation."""
 
-    data_headers = [header for header in headers if _normalize_header(header) not in _TRACK_ID_HEADERS]
+    data_headers: list[str] = []
+    for header in headers:
+        value = str(row.get(header, "")).strip()
+        if _normalize_header(header) in _TRACK_ID_HEADERS and ";" not in value:
+            continue
+        data_headers.append(header)
     values = [str(row.get(header, "")).strip() for header in data_headers]
     semicolon_values = [value for value in values if ";" in value]
     if not semicolon_values:
