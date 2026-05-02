@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, TypeAlias, cast
 
 import numpy as np
 
@@ -13,7 +13,7 @@ from bayescatrack.association.calibrated_costs import (
 )
 from bayescatrack.core.bridge import CalciumPlaneData
 
-CostMatrixResult = np.ndarray | tuple[np.ndarray, dict[str, np.ndarray]]
+CostMatrixResult: TypeAlias = np.ndarray | tuple[np.ndarray, dict[str, np.ndarray]]
 
 
 def _plane_from_rectangles(rectangles: list[tuple[int, int, int, int]]) -> CalciumPlaneData:
